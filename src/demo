@@ -1,0 +1,177 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shimmer/shimmer.dart';
+
+class AudioListPage extends StatefulWidget {
+  const AudioListPage({Key? key});
+
+  @override
+  State<AudioListPage> createState() => _AudioListPageState();
+}
+
+class _AudioListPageState extends State<AudioListPage> {
+  // int playIndex = 0;
+  var playIndex = 0.obs;
+  var isPlaying = false.obs;
+  final OnAudioQuery audioQuery = OnAudioQuery();
+  final audioPlayer = AudioPlayer();
+  var contro = Get.put(AudioListPage());
+  @override
+  void initState() {
+    super.initState();
+    checkPermission();
+  }
+
+  // Future<void> _playAudio(String audioPath, int index) async {
+  //   try {
+  //     if (playingIndex != index) {
+  //       await _audioPlayer.setAudioSource(AudioSource.uri(Uri.file(audioPath)));
+  //       await _audioPlayer.play();
+  //       setState(() {
+  //         playingIndex = index;
+  //       });
+  //     } else {
+  //       if (_audioPlayer.playing) {
+  //         await _audioPlayer.pause();
+  //       } else {
+  //         await _audioPlayer.play();
+  //       }
+  //     }
+  //   } catch (e) {
+  //     print("Error playing audio: $e");
+  //   }
+  // }
+
+  playSong(String? uri, index) {
+    playIndex.value = index;
+    try {
+      audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(uri!)));
+      audioPlayer.play();
+      isPlaying(true);
+    } on Exception catch (e) {
+      print(e.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    // _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('Select audio'),
+        ),
+        body: FutureBuilder<List<SongModel>>(
+            future: audioQuery.querySongs(
+                ignoreCase: true,
+                sortType: null,
+                uriType: UriType.EXTERNAL,
+                orderType: OrderType.ASC_OR_SMALLER),
+            builder: (context, items) {
+              if (items.data == null) {
+                return Center(
+                  child: CircularProgressIndicator(),
+                );
+              } else if (items.data!.isEmpty) {
+                return Center(
+                  child: Text('No songs found'),
+                );
+              } else
+                return ListView.builder(
+                    physics: BouncingScrollPhysics(),
+                    itemCount: items.data?.length,
+                    itemBuilder: (context, index) {
+                      return Obx(
+                        () => ListTile(
+                          title: Text(items.data![index].title),
+                          subtitle: Text(items.data![index].displayName),
+                          trailing: playIndex == index && isPlaying.value
+                              ? Icon(Icons.play_circle)
+                              : null,
+                          leading: QueryArtworkWidget(
+                              nullArtworkWidget: Icon(Icons.music_note),
+                              id: items.data![index].id,
+                              type: ArtworkType.AUDIO),
+                          onTap: () {
+                            playSong(items.data![index].uri, index);
+                          },
+                        ),
+                      );
+                    });
+            })
+        // : ListView.builder(
+        //     itemCount: audioFiles.length,
+        //     itemBuilder: (context, index) {
+        //       final audioFile = audioFiles[index];
+        //       final isPlaying = playingIndex == index;
+        //
+        //       return ListTile(
+        //         title: Text(audioFile.name),
+        //         leading: IconButton(
+        //           icon: Icon(
+        //             isPlaying ? Icons.pause : Icons.play_circle,
+        //             size: 30,
+        //           ),
+        //           onPressed: () {
+        //             _playAudio(audioFile.path ?? '', index);
+        //           },
+        //         ),
+        //         trailing: IconButton(
+        //           icon: const Icon(Icons.done),
+        //           onPressed: () {
+        //             returnAudio(audioFile.path ?? '');
+        //           },
+        //         ),
+        //       );
+        //     },
+        //   ),
+        );
+  }
+
+  returnAudio(String audioPath) {
+    Get.back(result: {'path': audioPath});
+  }
+
+  Widget _buildLoadingWidget() {
+    return ListView.builder(
+      itemCount: 10,
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: ListTile(
+            leading: const Icon(Icons.music_note_sharp),
+            title: Container(
+              height: 20,
+              color: Colors.white,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void checkPermission() async {
+    PermissionStatus status = await Permission.storage.request();
+    if (status.isGranted) {
+    } else {
+      checkPermission();
+    }
+  }
+  // void checkPermission() async {
+  //   if (!kIsWeb) {
+  //     bool permissionStatus = (_audioQuery.permissionsStatus) as bool;
+  //     if (!permissionStatus) {
+  //       await _audioQuery.permissionsStatus();
+  //     }
+  //     setState(() {});
+  //   }
+  // }
+}
